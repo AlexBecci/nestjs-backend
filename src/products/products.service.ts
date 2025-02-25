@@ -1,15 +1,27 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class ProductsService {
   //armo un constructor para llamar a las funciones de la clase
   constructor(private prismaService: PrismaService) { }
 
-  create(createProductDto: CreateProductDto) {
-    return this.prismaService.product.create({ data: createProductDto })
+  async create(createProductDto: CreateProductDto) {
+    try {
+      return await this.prismaService.product.create({
+        data: createProductDto,
+      })
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          throw new ConflictException(`Product with name ${createProductDto.name} already exists`)
+        }
+      }
+      throw new InternalServerErrorException()
+    }
   }
 
   findAll() {
@@ -36,7 +48,7 @@ export class ProductsService {
       ,
       data: updateProductDto
     })
-    if(!productFound){
+    if (!productFound) {
       throw new NotFoundException(`Product with id ${id} not found`)
     }
     return productFound
